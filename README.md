@@ -1,12 +1,20 @@
-you can run like this ..
+---
+title: TDS Project Main
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
 
-1 - make a virtual env first
+# TDS Project Main
 
-2 - install all requirements 
+FastAPI application for LLM-powered code generation.
 
-3 - run the below command 
+## How to run
 
+1. Set up environment variables
+2. Run with Docker or locally
 
-uvicorn app.main:app --reload
 
 
