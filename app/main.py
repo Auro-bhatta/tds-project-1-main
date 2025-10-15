@@ -1,38 +1,3 @@
-
-Hugging Face's logo Hugging Face
-
-Models
-Datasets
-Spaces
-Docs
-Enterprise
-Pricing
-
-Spaces:
-Auro-bhatta
-/
-tds-project-main
-App
-Files
-xet
-Community
-Settings
-tds-project-main
-/
-app
-/main.py
-Auro-bhatta's picture
-Auro-bhatta
-Update app/main.py
-08c5d96
-verified
-less than a minute ago
-raw
-history
-blame
-edit
-delete
-6.73 kB
 from fastapi import FastAPI, Request, BackgroundTasks
 import os, json
 from dotenv import load_dotenv
