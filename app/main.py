@@ -1,10 +1,10 @@
-
 from fastapi import FastAPI, Request, BackgroundTasks
 import os, json
 from dotenv import load_dotenv
 from app.llm_generator import generate_app_code, decode_attachments, generate_license
 from app.github_utils import create_repo, get_repo, create_or_update_file, enable_pages
 from app.notify import notify_evaluation_server
+from github import GithubException
 
 load_dotenv()
 USER_SECRET = os.getenv("USER_SECRET")
@@ -61,15 +61,11 @@ def process_request(data):
     
     files = gen.get("files", {})
     
-    # DEBUG: Print what was generated
+    # DEBUG
     print(f"🔍 Generated files: {list(files.keys())}")
     for fname in files.keys():
         print(f"   - {fname}: {len(files[fname])} characters")
     
-    # Create or get repository
-        # Create or get repository
-    from github import GithubException
-        # Create or get repository
     repo = None
     try:
         # Truncate description to 100 characters max
@@ -96,7 +92,7 @@ def process_request(data):
             print(f"❌ Repository creation failed with unexpected error")
             raise e
     
-        # Commit ALL files FIRST (before trying to get branches)
+        # Commit all files first
     print(f"📝 Committing {len(files)} files...")
     
     # Commit index.html
@@ -132,8 +128,7 @@ def process_request(data):
             print("   ✅ LICENSE committed")
         except Exception as e:
             print(f"   ❌ Failed to commit LICENSE: {e}")
-    
-    # NOW get the branch and commit SHA (after files are committed)
+            
     try:
         commit_sha = repo.get_branch("main").commit.sha
         print(f"✅ Got commit SHA: {commit_sha[:7]}")
@@ -152,17 +147,27 @@ def process_request(data):
     repo_url = f"https://github.com/{USERNAME}/{task_id}"
     pages_url = f"https://{USERNAME}.github.io/{task_id}/"
     
+    # Get commit SHA
+    try:
+        commit_sha = repo.get_branch("main").commit.sha
+    except:
+        commit_sha = "unknown"
+    
     # Notify evaluation server
     try:
+        notification_payload = {
+            "email": data["email"],
+            "task": task_id,
+            "round": round_num,
+            "nonce": data["nonce"],
+            "repo_url": repo_url,
+            "commit_sha": commit_sha,
+            "pages_url": pages_url
+        }
+        
         notify_evaluation_server(
             data["evaluation_url"],
-            data["email"],
-            task_id,
-            round_num,
-            data["nonce"],
-            repo_url,
-            commit_sha,
-            pages_url
+            notification_payload
         )
         print("✅ Evaluation server notified")
     except Exception as e:
@@ -178,25 +183,17 @@ def process_request(data):
 async def receive_request(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
     print("📩 Received request:", data)
-
-    # Step 0: Verify secret
     if data.get("secret") != USER_SECRET:
         print("❌ Invalid secret received.")
         return {"error": "Invalid secret"}
 
     processed = load_processed()
     key = f"{data['email']}::{data['task']}::round{data['round']}::nonce{data['nonce']}"
-
-    # Duplicate detection
     if key in processed:
         print(f"⚠ Duplicate request detected for {key}. Re-notifying only.")
         prev = processed[key]
         notify_evaluation_server(data.get("evaluation_url"), prev)
         return {"status": "ok", "note": "duplicate handled & re-notified"}
 
-    # Schedule background task (non-blocking)
     background_tasks.add_task(process_request, data)
-
-    # Immediate HTTP 200 acknowledgment
     return {"status": "accepted", "note": f"processing round {data['round']} started"}
-
